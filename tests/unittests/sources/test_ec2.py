@@ -208,6 +208,75 @@ SECONDARY_IP_METADATA_2018_09_24 = {
     "services": {"domain": "amazonaws.com", "partition": "aws"},
 }
 
+# collected from api version 2021-07-15/ with
+# python -c 'import json
+# from cloudinit.ec2_utils import get_instance_metadata as gm
+# print(json.dumps(gm("2021-07-15"), indent=1, sort_keys=True))'
+
+METADATA_2021_07_15_WITH_TAGS = {
+    "ami-id": "ami-0c02fb55956c7d316",
+    "ami-launch-index": "0",
+    "ami-manifest-path": "(unknown)",
+    "block-device-mapping": {"ami": "/dev/xvda", "root": "/dev/xvda"},
+    "events": {"maintenance": {"history": "[]", "scheduled": "[]"}},
+    "hibernation": {"configured": "false"},
+    "hostname": "ip-172-30-0-219.ec2.internal",
+    "identity-credentials": {
+        "ec2": {
+            "info": {
+                "AccountId": "329910648901",
+                "Code": "Success",
+                "LastUpdated": "2022-03-22T21:11:02Z",
+            }
+        }
+    },
+    "instance-action": "none",
+    "instance-id": "i-068df14d501027c26",
+    "instance-life-cycle": "on-demand",
+    "instance-type": "t2.micro",
+    "local-hostname": "ip-172-30-0-219.ec2.internal",
+    "local-ipv4": "172.30.0.219",
+    "mac": "12:f5:d3:7e:50:bb",
+    "metrics": {"vhostmd": '<?xml version="1.0" encoding="UTF-8"?>'},
+    "network": {
+        "interfaces": {
+            "macs": {
+                "12:f5:d3:7e:50:bb": {
+                    "device-number": "0",
+                    "interface-id": "eni-08f734cb68739458c",
+                    "ipv4-associations": {"54.173.226.38": "172.30.0.219"},
+                    "local-hostname": "ip-172-30-0-219.ec2.internal",
+                    "local-ipv4s": "172.30.0.219",
+                    "mac": "12:f5:d3:7e:50:bb",
+                    "owner-id": "979679899319",
+                    "public-hostname": "ec2-54-173-226-38.compute-1.amazonaws.com",
+                    "public-ipv4s": "54.173.226.38",
+                    "security-group-ids": "sg-0782b154a901d73db",
+                    "security-groups": "launch-wizard-2",
+                    "subnet-id": "subnet-64947c4e",
+                    "subnet-ipv4-cidr-block": "172.30.0.0/24",
+                    "vpc-id": "vpc-880b7fec",
+                    "vpc-ipv4-cidr-block": "172.30.0.0/16",
+                    "vpc-ipv4-cidr-blocks": "172.30.0.0/16",
+                }
+            }
+        }
+    },
+    "placement": {
+        "availability-zone": "us-east-1a",
+        "availability-zone-id": "use1-az2",
+        "region": "us-east-1",
+    },
+    "profile": "default-hvm",
+    "public-hostname": "ec2-54-173-226-38.compute-1.amazonaws.com",
+    "public-ipv4": "54.173.226.38",
+    "public-keys": {"my_key": ["ssh-rsa AAAAB...2w== my_key"]},
+    "reservation-id": "r-0288dad971427c2c2",
+    "security-groups": "launch-wizard-2",
+    "services": {"domain": "amazonaws.com", "partition": "aws"},
+    "tags": {"instance": {"Env": "Dev", "Name": "Test-instance"}},
+}
+
 M_PATH_NET = "cloudinit.sources.DataSourceEc2.net."
 
 
@@ -672,6 +741,22 @@ class TestEc2(test_helpers.HttprettyTestCase):
         self.assertEqual(1, len(logs_with_redacted_ttl))
         self.assertEqual(81, len(logs_with_redacted))
         self.assertEqual(0, len(logs_with_token))
+
+    def test_metadata_contains_tags(self):
+        """Latest metadata may contain tags"""
+        ds = self._setup_ds(
+            platform_data=self.valid_platform_data,
+            sys_cfg={"datasource": {"Ec2": {"strict_id": True}}},
+            md={"md": METADATA_2021_07_15_WITH_TAGS},
+            md_version="2021-07-15",
+        )
+
+        self.assertTrue(ds.get_data())
+
+        instance_tags = ds.crawl_metadata()["meta-data"]["tags"]["instance"]
+        self.assertEqual(
+            {"Env": "Dev", "Name": "Test-instance"}, instance_tags
+        )
 
     @mock.patch("cloudinit.net.dhcp.maybe_perform_dhcp_discovery")
     def test_valid_platform_with_strict_true(self, m_dhcp):
